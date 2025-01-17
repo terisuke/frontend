@@ -35,6 +35,46 @@ export async function initializeFaceDetector() {
   return faceLandmarker;
 }
 
+function getBlendshapeScore(blendshapes: any[], categories: string[]) {
+  return categories.reduce((acc, category) => {
+    const shape = blendshapes.find(b => b.categoryName.toLowerCase().includes(category.toLowerCase()));
+    return acc + (shape ? shape.score : 0);
+  }, 0) / categories.length;
+}
+
+function calculateEmotions(blendshapes: any[]) {
+  // 表情の特徴量を取得
+  const mouthSmile = getBlendshapeScore(blendshapes, ['mouthSmile']) * 1.5;
+  const mouthFrown = getBlendshapeScore(blendshapes, ['mouthFrown']) * 1.2;
+  const browRaise = getBlendshapeScore(blendshapes, ['browRaise', 'browInnerUp']);
+  const browDown = getBlendshapeScore(blendshapes, ['browDown']) * 1.3;
+  const eyeWide = getBlendshapeScore(blendshapes, ['eyeWide']);
+  const jawOpen = getBlendshapeScore(blendshapes, ['jawOpen']);
+
+  // 各感情のスコアを計算
+  const emotions = {
+    happy: Math.min(mouthSmile, 1),
+    sad: Math.min(mouthFrown + browRaise * 0.3, 1),
+    angry: Math.min(browDown + mouthFrown * 0.4, 1),
+    surprised: Math.min((eyeWide + jawOpen) / 2, 1),
+    neutral: 0  // 後で計算
+  };
+
+  // 他の感情の合計を計算
+  const totalExpression = Object.values(emotions).reduce((sum, score) => sum + score, 0);
+  
+  // neutralを計算（他の感情が少ないほど高くなる）
+  emotions.neutral = Math.max(0, 1 - totalExpression / 3);
+
+  // スコアの正規化
+  const total = Object.values(emotions).reduce((sum, score) => sum + score, 0);
+  for (const key in emotions) {
+    emotions[key as keyof typeof emotions] /= total;
+  }
+
+  return emotions;
+}
+
 export async function detectEmotion(video: HTMLVideoElement): Promise<EmotionScore | null> {
   if (!faceLandmarker) {
     await initializeFaceDetector();
@@ -44,15 +84,7 @@ export async function detectEmotion(video: HTMLVideoElement): Promise<EmotionSco
     const results = faceLandmarker!.detectForVideo(video, performance.now());
     if (results.faceBlendshapes && results.faceBlendshapes.length > 0) {
       const blendshapes = results.faceBlendshapes[0].categories;
-      
-      // MediaPipeの表情特徴点から感情スコアを計算
-      const emotions = {
-        happy: getBlendshapeScore(blendshapes, ['mouthSmile', 'cheekSquint']),
-        sad: getBlendshapeScore(blendshapes, ['mouthFrown', 'browDown']),
-        angry: getBlendshapeScore(blendshapes, ['browDown', 'noseSneer']),
-        surprised: getBlendshapeScore(blendshapes, ['eyeWide', 'jawOpen']),
-        neutral: getBlendshapeScore(blendshapes, ['neutral'])
-      };
+      const emotions = calculateEmotions(blendshapes);
 
       return {
         timestamp: performance.now(),
@@ -65,11 +97,4 @@ export async function detectEmotion(video: HTMLVideoElement): Promise<EmotionSco
   }
 
   return null;
-}
-
-function getBlendshapeScore(blendshapes: any[], categories: string[]) {
-  return categories.reduce((acc, category) => {
-    const shape = blendshapes.find(b => b.categoryName.toLowerCase().includes(category.toLowerCase()));
-    return acc + (shape ? shape.score : 0);
-  }, 0) / categories.length;
 }
