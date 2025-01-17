@@ -2,14 +2,19 @@
 
 import dynamic from 'next/dynamic';
 
+// WebカメラコンポーネントをSSRなしで動的にインポート
 const CameraStream = dynamic(() => import('./CameraStream'), {
   ssr: false,
-  loading: () => <div>カメラを読み込み中...</div>
+  loading: () => (
+    <div className="flex items-center justify-center h-64 bg-gray-900 rounded-lg">
+      <p className="text-white">カメラを読み込み中...</p>
+    </div>
+  ),
 });
 
 export default function EmotionAnalysis() {
   return (
-    <div>
+    <div className="w-full max-w-4xl mx-auto">
       <CameraStream />
     </div>
   );

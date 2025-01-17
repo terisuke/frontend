@@ -1,10 +1,23 @@
 import React from 'react';
+import './globals.css';
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export const metadata = {
+  title: '感情分析アプリ',
+  description: 'リアルタイム感情分析システム',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      {/* レイアウトの内容 */}
-      {children}
-    </div>
+    <html lang="ja">
+      <body>
+        <div>
+          {children}
+        </div>
+      </body>
+    </html>
   );
 }
